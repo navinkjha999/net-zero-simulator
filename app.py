@@ -8,14 +8,42 @@ import io
 # ==========================================
 st.set_page_config(page_title="Advanced BEMS Simulator", layout="wide", page_icon="🏢")
 st.title("🏢 Advanced Building Energy Management System (BEMS)")
-st.markdown("Optimize a multi-zone commercial building with Smart Battery Arbitrage and Solar PV.")
+st.markdown("Optimize a multi-zone commercial building with Smart Battery Arbitrage, Solar PV, and physical Wall Assemblies.")
 
 # ==========================================
 # 2. The GUI Sidebar (User Inputs)
 # ==========================================
 st.sidebar.header("Architecture (Multi-Zone)")
-office_r = st.sidebar.slider("Office Insulation (R-Value)", 1.5, 10.0, 3.5, 0.5)
-server_r = st.sidebar.slider("Server Room Insulation", 1.5, 10.0, 6.0, 0.5)
+
+# --- NEW: Thermodynamic Wall Assembly Calculator ---
+st.sidebar.subheader("Office Wall Assembly")
+thick_brick = st.sidebar.number_input("Brick Thickness (m)", value=0.10, step=0.01)
+thick_insulation = st.sidebar.number_input("Insulation Thickness (m)", value=0.10, step=0.01)
+thick_drywall = st.sidebar.number_input("Drywall Thickness (m)", value=0.012, step=0.001)
+
+# Known Thermal Conductivities (k) [W/mK]
+k_brick = 0.80
+k_insulation = 0.04
+k_drywall = 0.16
+
+# Known Convective Air Films (h) [W/m2K]
+h_outside = 34.0  # Windy outside air
+h_inside = 8.0    # Still inside air
+
+# Calculate the Total R-Value for the Office
+r_outside_film = 1 / h_outside
+r_brick = thick_brick / k_brick
+r_insulation = thick_insulation / k_insulation
+r_drywall = thick_drywall / k_drywall
+r_inside_film = 1 / h_inside
+
+office_r = r_outside_film + r_brick + r_insulation + r_drywall + r_inside_film
+
+# Display the calculated R-Value to the user
+st.sidebar.info(f"🧱 Office R-Value: **{office_r:.2f} m²K/W**")
+
+# Keep the server room as a simple slider for contrast
+server_r = st.sidebar.slider("Server Room Insulation (R-Value)", 1.5, 10.0, 6.0, 0.5)
 
 st.sidebar.header("Mechanical Systems")
 hvac_cop = st.sidebar.slider("HVAC Efficiency (COP)", 1.0, 5.0, 3.5, 0.5)
@@ -114,7 +142,9 @@ def run_master_simulation(r_office, r_server, cop, pv_m2, batt_capacity):
 # ==========================================
 monthly_costs, hourly_data = run_master_simulation(office_r, server_r, hvac_cop, pv_area, battery_size)
 total_annual_bill = sum(monthly_costs)
-upfront_cost = (office_r * 2000) + (server_r * 1500) + (hvac_cop * 3000) + (pv_area * 300) + (battery_size * 500)
+
+# Update upfront cost to factor in the material thickness rather than just the generic R-value
+upfront_cost = (thick_insulation * 50000) + (thick_brick * 20000) + (server_r * 1500) + (hvac_cop * 3000) + (pv_area * 300) + (battery_size * 500)
 
 # Top KPIs
 col1, col2, col3 = st.columns(3)
@@ -144,7 +174,7 @@ with col_chart2:
 st.divider()
 
 # ==========================================
-# 5. The Download Button!
+# 5. The Download Button
 # ==========================================
 st.subheader("Data Export")
 st.write("Download the full 8,760-hour simulation dataset for use in Excel, Python, or Tableau.")
